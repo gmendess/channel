@@ -1,0 +1,4 @@
+#ifndef _CHANNEL_QUEUE_H
+#define _CHANNEL_QUEUE_H
+
+#endif // _CHANNEL_QUEUE_H
