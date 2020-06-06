@@ -1,6 +1,8 @@
 #ifndef _CHANNEL_QUEUE_H
 #define _CHANNEL_QUEUE_H
 
+#include <stdlib.h>
+
 struct qnode {
   void* value; // conteúdo armazenado pelo nó
   struct qnode* next; // próximo nó
