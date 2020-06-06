@@ -23,5 +23,6 @@ typedef struct queue queue_t;
 int queue_init(queue_t* q); // inicializa uma fila com os valores padrões
 int queue_push_back(queue_t* q, void* value); // adiciona nó no final da fila
 int queue_pop_front(queue_t* q, void** ret); // remove primeiro nó da fila
+int queue_destroy(queue_t* q);
 
 #endif // _CHANNEL_QUEUE_H
