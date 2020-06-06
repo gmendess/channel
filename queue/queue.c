@@ -29,7 +29,10 @@ int queue_pop_front(queue_t* q, void** ret) {
     return 1;
 
   qnode_t* first = q->head;
-  *ret = first->value;
+  
+  // se ret for NULL, não é necessário capturar o valor a ser retirado da fila
+  if(ret)
+    *ret = first->value;
   q->head = first->next;
 
   free(first);
