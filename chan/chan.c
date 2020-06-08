@@ -129,3 +129,10 @@ end:
 
   return status;
 }
+
+void chan_for_range(chan_t* ch, void (*f)(void* chan_value, void* args), void* args) {
+  void* value = NULL;
+  while(chan_recv(ch, &value) != ECLOSED) {
+    f(value, args);
+  }
+}

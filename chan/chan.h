@@ -42,5 +42,6 @@ void chan_close(chan_t* c);
 void chan_destroy(chan_t* c);
 int chan_send(chan_t* c, void* value);
 int chan_recv(chan_t* c, void** ret);
+void chan_for_range(chan_t* ch, void (*f)(void* chan_value, void* args), void* args);
 
 #endif // _CHANNEL_H
