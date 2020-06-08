@@ -2,12 +2,10 @@
 #include <stdio.h>
 #include "queue.h"
 
-int queue_init(queue_t* q) {
+void queue_init(queue_t* q) {
   q->head = NULL;
   q->tail = NULL;
   q->length = 0;
-
-  return 0;
 }
 
 int queue_push_back(queue_t* q, void* value) {
