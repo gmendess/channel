@@ -19,7 +19,7 @@ int queue_push_back(queue_t* q, void* value) {
   q->tail = new_node;
   ++q->length;
 
-  return 0;
+  return SUCCESS;
 }
 
 void queue_pop_front(queue_t* q, void** ret) {

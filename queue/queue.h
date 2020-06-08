@@ -2,6 +2,7 @@
 #define _CHANNEL_QUEUE_H
 
 #include <stdlib.h>
+#include "../errors/errors.h"
 
 struct qnode {
   void* value; // conteúdo armazenado pelo nó
@@ -12,7 +13,7 @@ typedef struct qnode qnode_t;
 #define QNODE_NEW(name, value) \
   qnode_t* name = malloc(sizeof(qnode_t)); \
   if(!name) \
-    return 1; \
+    return ENOMEM; \
   name->value = value; \
   name->next = NULL \
  

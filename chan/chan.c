@@ -6,18 +6,18 @@
 #include <stdio.h>
 
 int chan_init(chan_t* c, size_t capacity) {
-  int status = 0;
+  int status = SUCCESS;
 
   // inicializa o semáforo de leitura e checa por erro
-  if((status = pthread_cond_init(&c->cond_read.cond, NULL)) != 0)
+  if((status = pthread_cond_init(&c->cond_read.cond, NULL)) != SUCCESS)
     goto ret;
  
   // inicializa o semáforo de escrita e checa por erro
-  if((status = pthread_cond_init(&c->cond_write.cond, NULL)) != 0)
+  if((status = pthread_cond_init(&c->cond_write.cond, NULL)) != SUCCESS)
     goto error_1;
 
   // inicializa o mutex que evita race-condition nos membros do canal e checa por erro
-  if((status = pthread_mutex_init(&c->mutex, NULL)) != 0)
+  if((status = pthread_mutex_init(&c->mutex, NULL)) != SUCCESS)
     goto error_2;
 
   queue_init(&c->queue);
@@ -36,8 +36,11 @@ int chan_init(chan_t* c, size_t capacity) {
     return status;
 }
 
-int chan_destroy(chan_t* c) {
-  pthread_mutex_lock(&c->mutex);
+void chan_close(chan_t* c) {
+  // já fechado
+  if(c->closed)
+    return;
+
   c->closed = true;
 
   // verifica se o canal de leitura está ocupado, ou seja, alguém está esperando por informação
@@ -49,6 +52,12 @@ int chan_destroy(chan_t* c) {
   if(c->cond_write.busy)
     pthread_cond_broadcast(&c->cond_write.cond); // informa a todos que o canal foi fechado
   pthread_cond_destroy(&c->cond_write.cond); // destrói a variável condicional de escrita
+}
+
+void chan_destroy(chan_t* c) {
+  pthread_mutex_lock(&c->mutex);
+  
+  chan_close(c);
 
   // destrói a fila.
   // ATENÇÃO: caso algum conteúdo dos nós da fila seja alocado dinamicamente, ele não será
@@ -58,14 +67,16 @@ int chan_destroy(chan_t* c) {
 
   pthread_mutex_unlock(&c->mutex); // unlock na mutex
   pthread_mutex_destroy(&c->mutex); // destrói a mutex;
-
-  return 0; // ok
 }
 
 int chan_send(chan_t* c, void* value) {
+  int status = SUCCESS;
+
   pthread_mutex_lock(&c->mutex);
-  if(c->closed)
+  if(c->closed) {
+    status = ECLOSED;
     goto end; // não é possível enviar nada em um canal fechado
+  }
 
   // tamanho da fila é igual à capacidade do canal, não é possível inserir mais nada 
   while(c->queue.length == c->capacity) {
@@ -73,29 +84,34 @@ int chan_send(chan_t* c, void* value) {
     chan_cond_wait(&c->cond_write, &c->mutex);
 
     // após receber o sinal de escrita, verifica se o canal foi fechado enquanto aguardava
-    if(c->closed)
+    if(c->closed) {
+      status = ECLOSED;
       goto end;
+    }
 
     // após receber o sinal, verifica novamente se a fila está cheia (por isso o while), se estiver, aguarda
     // novamente outro sinal para que possa inserir na fila.
   }
 
-  queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
+  status = queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
 
   pthread_cond_signal(&c->cond_read.cond); // informa que um valor foi inserido na fila
 end:
   pthread_mutex_unlock(&c->mutex);
 
-  return 0;
+  return status;
 }
 
 int chan_recv(chan_t* c, void** ret) {
+  int status = SUCCESS;
+
   pthread_mutex_lock(&c->mutex);
 
   // tamanho da fila é 0, não há nada pra ser lido 
   while(c->queue.length == 0) {
     // tentativa de ler de um canal fechado e vazio
     if(c->closed) {
+      status = ECLOSED;
       if(ret) *ret = NULL; // se ret for válido, aponta pra NULL
       goto end; // pula para o final, liberando mutex
     }
@@ -111,5 +127,5 @@ int chan_recv(chan_t* c, void** ret) {
 end:
   pthread_mutex_unlock(&c->mutex);
 
-  return 0;
+  return status;
 }
