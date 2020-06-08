@@ -93,14 +93,22 @@ int chan_recv(chan_t* c, void** ret) {
   pthread_mutex_lock(&c->mutex);
 
   // tamanho da fila é 0, não há nada pra ser lido 
-  if(c->queue.length == 0) {
+  while(c->queue.length == 0) {
+    // tentativa de ler de um canal fechado e vazio
+    if(c->closed) {
+      if(ret) *ret = NULL; // se ret for válido, aponta pra NULL
+      goto end; // pula para o final, liberando mutex
+    }
+
     // unlock no mutex e fica esperando um sinal em c->cond_read, indicando que um valor pode ser lido
-    pthread_cond_wait(&c->cond_read, &c->mutex);
+    chan_cond_wait(&c->cond_read, &c->mutex);
+    // após receber o sinal, verifica novamente se a lista está vazia (por isso o while) se não estiver, faz o pop na queue
   }
 
-  queue_pop_front(&c->queue, ret);
+  queue_pop_front(&c->queue, ret); // retira um item da fila e insere o conteúdo em ret. Se ret for NULL, o item não é inserido
 
-  pthread_cond_signal(&c->cond_write);
+  pthread_cond_signal(&c->cond_write.cond);
+end:
   pthread_mutex_unlock(&c->mutex);
 
   return 0;
