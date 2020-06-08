@@ -4,6 +4,11 @@
 
 chan_t ch;
 
+void print_number(void* chan_value, void* args) {
+  printf("%s: %d\n", (char*) args, *(int*) chan_value);
+  free(chan_value);
+}
+
 void* producer(void* args) {
 
   while(1) {
@@ -27,10 +32,7 @@ void* producer(void* args) {
 void* consumer(void* args) {
   void* value = NULL;
 
-  while(chan_recv(&ch, &value) != ECLOSED) {
-    printf("thread %ld >>> %d\n", pthread_self(), *(int*) value);
-    free(value);
-  }
+  chan_for_range(&ch, print_number, "Valor impresso: ");
   puts("channel closed!");
 
   pthread_exit(0);
@@ -42,11 +44,10 @@ int main() {
   pthread_t prod_id, con1_id, con2_id;
   
   pthread_create(&prod_id, NULL, producer, NULL);
-  pthread_join(prod_id, NULL);
-
   pthread_create(&con1_id, NULL, consumer, NULL);
   pthread_create(&con2_id, NULL, consumer, NULL);
 
+  pthread_join(prod_id, NULL);
   pthread_join(con1_id, NULL);
   pthread_join(con2_id, NULL);
 
