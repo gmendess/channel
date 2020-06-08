@@ -37,14 +37,29 @@ int chan_init(chan_t* c, size_t capacity) {
 }
 
 int chan_destroy(chan_t* c) {
-  pthread_cond_destroy(&c->cond_write);
-  pthread_cond_destroy(&c->cond_read);
-  pthread_mutex_destroy(&c->mutex);
-  queue_destroy(&c->queue);
+  pthread_mutex_lock(&c->mutex);
   c->closed = true;
-  c->capacity = 0;
 
-  return 0;
+  // verifica se o canal de leitura está ocupado, ou seja, alguém está esperando por informação
+  if(c->cond_read.busy)
+    pthread_cond_broadcast(&c->cond_read.cond); // se estiver, informa a todos que o canal foi fechado
+  pthread_cond_destroy(&c->cond_read.cond); // destrói a variável condicional de leitura
+
+  // verifica se o canal de escrita está ocupado, ou seja, alguém está tentando enviar uma informação
+  if(c->cond_write.busy)
+    pthread_cond_broadcast(&c->cond_write.cond); // informa a todos que o canal foi fechado
+  pthread_cond_destroy(&c->cond_write.cond); // destrói a variável condicional de escrita
+
+  // destrói a fila.
+  // ATENÇÃO: caso algum conteúdo dos nós da fila seja alocado dinamicamente, ele não será
+  // destruído, isso é responsabilidade de quem o alocou!
+  queue_destroy(&c->queue);
+  c->capacity = 0; // valor padrão da capacidade
+
+  pthread_mutex_unlock(&c->mutex); // unlock na mutex
+  pthread_mutex_destroy(&c->mutex); // destrói a mutex;
+
+  return 0; // ok
 }
 
 int chan_send(chan_t* c, void* value) {
