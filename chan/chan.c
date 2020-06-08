@@ -9,11 +9,11 @@ int chan_init(chan_t* c, size_t capacity) {
   int status = 0;
 
   // inicializa o semáforo de leitura e checa por erro
-  if((status = pthread_cond_init(&c->cond_read, NULL)) != 0)
+  if((status = pthread_cond_init(&c->cond_read.cond, NULL)) != 0)
     goto ret;
  
   // inicializa o semáforo de escrita e checa por erro
-  if((status = pthread_cond_init(&c->cond_write, NULL)) != 0)
+  if((status = pthread_cond_init(&c->cond_write.cond, NULL)) != 0)
     goto error_1;
 
   // inicializa o mutex que evita race-condition nos membros do canal e checa por erro
@@ -21,15 +21,17 @@ int chan_init(chan_t* c, size_t capacity) {
     goto error_2;
 
   queue_init(&c->queue);
+  c->cond_read.busy = false;
+  c->cond_write.busy = false;
   c->closed = false;
   c->capacity = capacity;
   goto ret; // tudo ok, retorna status
 
   // error handling
   error_2:
-    pthread_cond_destroy(&c->cond_write);
+    pthread_cond_destroy(&c->cond_write.cond);
   error_1:
-    pthread_cond_destroy(&c->cond_read);
+    pthread_cond_destroy(&c->cond_read.cond);
   ret:
     return status;
 }
