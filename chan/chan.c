@@ -64,16 +64,26 @@ int chan_destroy(chan_t* c) {
 
 int chan_send(chan_t* c, void* value) {
   pthread_mutex_lock(&c->mutex);
-  
+  if(c->closed)
+    goto end; // não é possível enviar nada em um canal fechado
+
   // tamanho da fila é igual à capacidade do canal, não é possível inserir mais nada 
-  if(c->queue.length == c->capacity) {
+  while(c->queue.length == c->capacity) {
     // unlock no mutex e fica esperando um sinal em c->cond_write, indicando que pode inserir na fila
-    pthread_cond_wait(&c->cond_write, &c->mutex); 
+    chan_cond_wait(&c->cond_write, &c->mutex);
+
+    // após receber o sinal de escrita, verifica se o canal foi fechado enquanto aguardava
+    if(c->closed)
+      goto end;
+
+    // após receber o sinal, verifica novamente se a fila está cheia (por isso o while), se estiver, aguarda
+    // novamente outro sinal para que possa inserir na fila.
   }
 
-  queue_push_back(&c->queue, value);
+  queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
 
-  pthread_cond_signal(&c->cond_read); // informa que um valor foi inserido na fila
+  pthread_cond_signal(&c->cond_read.cond); // informa que um valor foi inserido na fila
+end:
   pthread_mutex_unlock(&c->mutex);
 
   return 0;
