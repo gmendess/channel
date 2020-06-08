@@ -22,7 +22,7 @@ int queue_push_back(queue_t* q, void* value) {
   return 0;
 }
 
-int queue_pop_front(queue_t* q, void** ret) {
+void queue_pop_front(queue_t* q, void** ret) {
   qnode_t* first = q->head;
 
   // se ret for NULL, não é necessário capturar o valor a ser retirado da fila
@@ -32,11 +32,9 @@ int queue_pop_front(queue_t* q, void** ret) {
 
   free(first);
   --q->length;
-
-  return 0;
 }
 
-int queue_destroy(queue_t* q) {
+void queue_destroy(queue_t* q) {
   qnode_t* node = q->head;
 
   // Atenção: caso algum nó da fila tiver como conteúdo um ponteiro alocado com malloc, esse ponteiro não será liberado. Qualquer
@@ -49,6 +47,4 @@ int queue_destroy(queue_t* q) {
 
   q->length = 0;
   q->head = q->tail = NULL;
-
-  return 0;
 }
