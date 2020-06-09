@@ -8,14 +8,14 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-// Esse tipo contém uma pthread_cond_t e um booleano indicando se a variável condicional está ou não
+// Esse tipo contém uma pthread_cond_t e um contador indicando se a variável condicional está ou não
 // em estado de waiting. A documentação diz que ao tentar destruir uma pthread_cond_t que ainda tem um
 // pthread_cond_wait pendente, o comportamente depende da implementação, podendo retornar EBUSY ou ficar
 // bloqueado até o sinal ser enviado (ref. https://linux.die.net/man/3/pthread_cond_destroy - vá em Errors). 
 // Como não posso depender da implementação, vou fazer isso eu mesmo
 struct chan_cond {
   pthread_cond_t cond;
-  bool busy;
+  size_t busy;
 };
 typedef struct chan_cond chan_cond_t;
 
@@ -23,9 +23,9 @@ typedef struct chan_cond chan_cond_t;
 // c = ponteiro para chan_cond_t
 // mutex = ponteiro para pthread_mutex_t
 #define chan_cond_wait(c, mutex) \
-  (*c).busy = true; \
+  (*c).busy += 1; \
   pthread_cond_wait(c.cond, mutex); \
-  (*c).busy = false;
+  (*c).busy -= 1;
 
 struct chan {
   queue_t queue;
