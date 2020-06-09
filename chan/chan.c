@@ -56,7 +56,7 @@ void chan_close(chan_t* c) {
 
 void chan_destroy(chan_t* c) {
   pthread_mutex_lock(&c->mutex);
-  
+
   chan_close(c);
 
   // destrói a fila.
@@ -69,34 +69,53 @@ void chan_destroy(chan_t* c) {
   pthread_mutex_destroy(&c->mutex); // destrói a mutex;
 }
 
-int chan_send(chan_t* c, void* value) {
-  int status = SUCCESS;
+static int __unbuffered_chan_send(chan_t* c) {
+  if(c->closed)
+    return ECLOSED;
 
-  pthread_mutex_lock(&c->mutex);
-  if(c->closed) {
-    status = ECLOSED;
-    goto end; // não é possível enviar nada em um canal fechado
+  // ninguém está esperando para poder ler
+  while(!c->cond_read.busy) {
+    chan_cond_wait(&c->cond_write, &c->mutex); // tentando escrever, espera pelo sinal de alguém tentando ler
+    if(c->closed)
+      return ECLOSED; // canal fechado enquanto esperava
   }
 
-  // tamanho da fila é igual à capacidade do canal, não é possível inserir mais nada 
+  return SUCCESS;
+}
+
+static int __buffered_chan_send(chan_t* c) {
+  if(c->closed)
+    return ECLOSED;
+
+  // é necessário esperar para escrever, pois a fila está lotada
   while(c->queue.length == c->capacity) {
     // unlock no mutex e fica esperando um sinal em c->cond_write, indicando que pode inserir na fila
     chan_cond_wait(&c->cond_write, &c->mutex);
 
     // após receber o sinal de escrita, verifica se o canal foi fechado enquanto aguardava
-    if(c->closed) {
-      status = ECLOSED;
-      goto end;
-    }
+    if(c->closed)
+      return ECLOSED;
 
-    // após receber o sinal, verifica novamente se a fila está cheia (por isso o while), se estiver, aguarda
-    // novamente outro sinal para que possa inserir na fila.
+    // o while é pra verificar novamente se a fila está cheia para evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
   }
 
-  status = queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
+  return SUCCESS;
+}
+
+int chan_send(chan_t* c, void* value) {
+  int status = SUCCESS;
+
+  pthread_mutex_lock(&c->mutex);
+
+  if(c->capacity == 0)
+    status = __unbuffered_chan_send(c);
+  else
+    status = __buffered_chan_send(c);
+
+  if(status != ECLOSED)
+    status = queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
 
   pthread_cond_signal(&c->cond_read.cond); // informa que um valor foi inserido na fila
-end:
   pthread_mutex_unlock(&c->mutex);
 
   return status;
