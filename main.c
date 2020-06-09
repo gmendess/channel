@@ -5,14 +5,17 @@
 chan_t ch;
 
 void print_number(void* chan_value, void* args) {
-  printf("%s: %d\n", (char*) args, *(int*) chan_value);
+  printf("(%ld) %s: %d\n", pthread_self() % 10,(char*) args, *(int*) chan_value);
   free(chan_value);
 }
 
 void* producer(void* args) {
-
+  int* value = malloc(sizeof(int));
+  *value = 333;
+  chan_send(&ch, value);
+ 
   while(1) {
-    int* value = malloc(sizeof(int));
+    value = malloc(sizeof(int));
     
     scanf("%d", value);
     if(*value == 0) {
@@ -21,7 +24,6 @@ void* producer(void* args) {
     }
     
     chan_send(&ch, value);
-    puts("Produced!");
   }
 
   chan_close(&ch);
@@ -32,7 +34,7 @@ void* producer(void* args) {
 void* consumer(void* args) {
   void* value = NULL;
 
-  chan_for_range(&ch, print_number, "Valor impresso: ");
+  chan_for_range(&ch, print_number, "Valor impresso");
   puts("channel closed!");
 
   pthread_exit(0);
@@ -40,7 +42,7 @@ void* consumer(void* args) {
 
 int main() {
 
-  chan_init(&ch, 2);
+  chan_init(&ch, 0);
   pthread_t prod_id, con1_id, con2_id;
   
   pthread_create(&prod_id, NULL, producer, NULL);
