@@ -121,29 +121,58 @@ int chan_send(chan_t* c, void* value) {
   return status;
 }
 
+static int __unbuffered_chan_recv(chan_t* c) {
+  if(c->closed)
+    return ECLOSED;
+
+  if(c->cond_write.busy)
+    pthread_cond_signal(&c->cond_write.cond); // avisa que uma tentativa de leitura está tentando ser feita
+
+  do {
+    chan_cond_wait(&c->cond_read, &c->mutex); // dá um unlock na mutex para que a thread que deseja inserir possa continuar a ação e espera pela resposta
+
+    if(c->closed) // canal foi fechado enquanto esperava
+      return ECLOSED;
+
+    // o do-while é pra verificar se o item realmente foi inserido na fila e evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
+  } while(c->queue.length == 0);
+
+  return SUCCESS;
+}
+
+static int __buffered_chan_recv(chan_t* c) {
+  // tamanho da fila é 0, não há nada pra ser lido 
+  while(c->queue.length == 0) {
+    // tentativa de ler de um canal fechado e vazio
+    if(c->closed)
+      return ECLOSED;
+
+    // unlock no mutex e fica esperando um sinal em c->cond_read, indicando que um valor pode ser lido
+    chan_cond_wait(&c->cond_read, &c->mutex);
+
+    // o while é pra verificar novamente se o item realmente foi inserido na fila e evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
+  }
+
+  return SUCCESS;
+}
+
 int chan_recv(chan_t* c, void** ret) {
   int status = SUCCESS;
 
   pthread_mutex_lock(&c->mutex);
 
-  // tamanho da fila é 0, não há nada pra ser lido 
-  while(c->queue.length == 0) {
-    // tentativa de ler de um canal fechado e vazio
-    if(c->closed) {
-      status = ECLOSED;
-      if(ret) *ret = NULL; // se ret for válido, aponta pra NULL
-      goto end; // pula para o final, liberando mutex
-    }
-
-    // unlock no mutex e fica esperando um sinal em c->cond_read, indicando que um valor pode ser lido
-    chan_cond_wait(&c->cond_read, &c->mutex);
-    // após receber o sinal, verifica novamente se a lista está vazia (por isso o while) se não estiver, faz o pop na queue
+  // verifica se o channel é buffered ou unbuffered
+  if(c->capacity == 0)
+    status = __unbuffered_chan_recv(c);
+    // channel unbuffered não avisa que o conteúdo foi lido, pois poderia influenciar em uma segunda escrita
+  else {
+    status = __buffered_chan_recv(c);
+    pthread_cond_signal(&c->cond_write.cond);
   }
 
-  queue_pop_front(&c->queue, ret); // retira um item da fila e insere o conteúdo em ret. Se ret for NULL, o item não é inserido
+  if(status == SUCCESS)
+    queue_pop_front(&c->queue, ret); // retira um item da fila e insere o conteúdo em ret.
 
-  pthread_cond_signal(&c->cond_write.cond);
-end:
   pthread_mutex_unlock(&c->mutex);
 
   return status;
