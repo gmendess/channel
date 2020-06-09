@@ -21,8 +21,8 @@ int chan_init(chan_t* c, size_t capacity) {
     goto error_2;
 
   queue_init(&c->queue);
-  c->cond_read.busy = false;
-  c->cond_write.busy = false;
+  c->cond_read.busy = 0;
+  c->cond_write.busy = 0;
   c->closed = false;
   c->capacity = capacity;
   goto ret; // tudo ok, retorna status
