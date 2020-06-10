@@ -2,49 +2,49 @@
 #include <stdio.h>
 #include "queue.h"
 
-void queue_init(queue_t* q) {
-  q->head = NULL;
-  q->tail = NULL;
+int queue_init(queue_t* q, size_t capacity) {
+  // se a capacidade do channel for 0, significa que ele é unbuffered, contudo mesmo assim é necessário
+  // alocar espaço para ao menos um elemento, por isso a verificação
+  q->capacity = capacity ? capacity : 1;
+  
+  q->content = calloc(q->capacity, sizeof(void*));
+  if(q->content == NULL)
+    return ENOMEM;
+  
+  q->head   = 0;
+  q->tail   = 0;
   q->length = 0;
-}
-
-int queue_push_back(queue_t* q, void* value) {
-  QNODE_NEW(new_node, value);
-
-  if(q->length == 0)
-    q->head = new_node;
-  else
-    q->tail->next = new_node;
-
-  q->tail = new_node;
-  ++q->length;
 
   return SUCCESS;
 }
 
-void queue_pop_front(queue_t* q, void** ret) {
-  qnode_t* first = q->head;
 
+// Ao adicionar um elemento na fila, coloca ele na posição delimitada por q->tail e incrementa esse contador. Caso q->tail chegue na capacidade
+// máxima da fila, ele vai para a posição 0, simulando uma circularidade. Note que não é feita nenhuma verificação se a fila está cheia, pois o
+// channel já faz isso pra saber se ele deve, ou não, ficar bloqueado, então gastaria recursos para fazer a mesma coisa duas vezes.
+void queue_push_back(queue_t* q, void* value) {
+  q->content[q->tail] = value;
+  q->tail = (q->tail + 1) % q->capacity; // cria efeito de circularidade na fila
+  q->length++;
+}
+
+// Ao remover um elemento da fila, não é necessário mover todos os outros, apenas incrementar q->head. Caso q->head chegue na capacidade
+// máxima da fila, ele retorna para a posição 0, simulando uma circularidade
+void queue_pop_front(queue_t* q, void** ret) {  
   // se ret for NULL, não é necessário capturar o valor a ser retirado da fila
   if(ret)
-    *ret = first->value;
-  q->head = first->next;
+    *ret = q->content[q->head];
 
-  free(first);
-  --q->length;
+  q->head = (q->head + 1) % q->capacity;
+  q->length--;
 }
 
 void queue_destroy(queue_t* q) {
-  qnode_t* node = q->head;
+  free(q->content);
 
-  // Atenção: caso algum nó da fila tiver como conteúdo um ponteiro alocado com malloc, esse ponteiro não será liberado. Qualquer
-  // free realizado por essa função é responsável apenas por liberar recursos da própria fila, e não de terceiros!
-  while(node != NULL) {
-    q->head = q->head->next;
-    free(node);
-    node = q->head;
-  }
-
-  q->length = 0;
-  q->head = q->tail = NULL;
+  q->content  = NULL;
+  q->capacity = 0;
+  q->length   = 0;
+  q->head     = 0;
+  q->tail     = 0;
 }
