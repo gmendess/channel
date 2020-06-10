@@ -20,7 +20,9 @@ int chan_init(chan_t* c, size_t capacity) {
   if((status = pthread_mutex_init(&c->mutex, NULL)) != SUCCESS)
     goto error_2;
 
-  queue_init(&c->queue);
+  if((status = queue_init(&c->queue, capacity)) != SUCCESS )
+    goto error_3;
+
   c->cond_read.busy = 0;
   c->cond_write.busy = 0;
   c->closed = false;
@@ -28,6 +30,8 @@ int chan_init(chan_t* c, size_t capacity) {
   goto ret; // tudo ok, retorna status
 
   // error handling
+  error_3:
+    pthread_mutex_destroy(&c->mutex);
   error_2:
     pthread_cond_destroy(&c->cond_write.cond);
   error_1:
@@ -112,7 +116,7 @@ int chan_send(chan_t* c, void* value) {
     status = __buffered_chan_send(c);
 
   if(status != ECLOSED)
-    status = queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
+    queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
 
   pthread_cond_signal(&c->cond_read.cond); // informa que um valor foi inserido na fila
   pthread_mutex_unlock(&c->mutex);
