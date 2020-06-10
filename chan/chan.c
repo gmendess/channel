@@ -37,28 +37,27 @@ int chan_init(chan_t* c, size_t capacity) {
 }
 
 void chan_close(chan_t* c) {
-  // já fechado
-  if(c->closed)
-    return;
-
-  c->closed = true;
-
-  // verifica se o canal de leitura está ocupado, ou seja, alguém está esperando por informação
-  if(c->cond_read.busy)
-    pthread_cond_broadcast(&c->cond_read.cond); // se estiver, informa a todos que o canal foi fechado
-  pthread_cond_destroy(&c->cond_read.cond); // destrói a variável condicional de leitura
-
-  // verifica se o canal de escrita está ocupado, ou seja, alguém está tentando enviar uma informação
-  if(c->cond_write.busy)
-    pthread_cond_broadcast(&c->cond_write.cond); // informa a todos que o canal foi fechado
-  pthread_cond_destroy(&c->cond_write.cond); // destrói a variável condicional de escrita
+  pthread_mutex_lock(&c->mutex);
+  if(!c->closed) {  
+    c->closed = true;
+  
+    // verifica se o canal de leitura está ocupado, ou seja, alguém está esperando por informação
+    if(c->cond_read.busy)
+      pthread_cond_broadcast(&c->cond_read.cond); // se estiver, informa a todos que o canal foi fechado
+    pthread_cond_destroy(&c->cond_read.cond); // destrói a variável condicional de leitura
+  
+    // verifica se o canal de escrita está ocupado, ou seja, alguém está tentando enviar uma informação
+    if(c->cond_write.busy)
+      pthread_cond_broadcast(&c->cond_write.cond); // informa a todos que o canal foi fechado
+    pthread_cond_destroy(&c->cond_write.cond); // destrói a variável condicional de escrita
+  }
+  pthread_mutex_unlock(&c->mutex);
 }
 
 void chan_destroy(chan_t* c) {
-  pthread_mutex_lock(&c->mutex);
-
   chan_close(c);
 
+  pthread_mutex_lock(&c->mutex);
   // destrói a fila.
   // ATENÇÃO: caso algum conteúdo dos nós da fila seja alocado dinamicamente, ele não será
   // destruído, isso é responsabilidade de quem o alocou!
