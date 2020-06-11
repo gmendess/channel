@@ -8,7 +8,7 @@ struct queue {
   size_t head; // indice em que o primeiro elemento se encontra, não é necessariamente 0
   size_t tail; // indice em que o próximo elemento será armazenado
   size_t length; // número atual de elementos
-  size_t capacity; // capacidade máxima da fila (é igual a capacidade do channel)
+  size_t capacity; // capacidade máxima da fila (é igual a capacidade do channel caso este seja buffered)
   void** content; // array de void*, que armazenará 
 };
 typedef struct queue queue_t;
