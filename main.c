@@ -1,59 +1,59 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
 #include "chan/chan.h"
 
-void echo(void* _msg, void* args) {
-  char* msg = (char*) _msg;
-  int i = 0;
+chan_t ch;
 
-  printf("Mensagem ecoada em maiúsculo: ");
-  while(msg[i]) {
-    putchar(toupper(msg[i]));
-    i++;
-  }
-  puts("\n");
-}
+void* producer(void* args) {
 
-void* recv_msg(void* args) {
-  chan_t* ch = (chan_t*) args;
-
-  chan_for_range(ch, echo, NULL);
-  puts("canal fechado, nada mais será ecoado!");
-
-  return NULL;
-}
-
-void* send_msg(void* args) {
-  chan_t* ch = (chan_t*) args;
-
-  char buf[256] = {0};  
   while(1) {
-    fgets(buf, sizeof(buf), stdin);
-    if(buf[0] == '\n')
+    int* value = malloc(sizeof(int));
+    
+    scanf("%d", value);
+    if(*value == 0) {
+      free(value);
       break;
-
-    buf[strlen(buf) - 1] = '\0';
-    chan_send(ch, buf);
+    }
+    
+    chan_send(&ch, value);
+    puts("Produced!");
   }
 
-  chan_close(ch);
+  chan_close(&ch);
+
+  pthread_exit(0);
+}
+
+void* consumer(void* args) {
+  void* value = NULL;
+
+  printf("thread %ld >>> ", pthread_self());
+  if(chan_recv(&ch, &value) != ECLOSED) {
+    printf("%d\n", *(int*) value);
+    free(value);
+  }
+  else {
+    puts("Channel closed!");
+  }
+
   pthread_exit(0);
 }
 
 int main() {
 
-  chan_t ch;
-
-  chan_init(&ch, 0);
-  pthread_t prod_id, con1_id;
-
-  pthread_create(&prod_id, NULL, send_msg, &ch);
-  pthread_create(&con1_id, NULL, recv_msg, &ch);
-
+  chan_init(&ch, 2);
+  pthread_t prod_id, con1_id, con2_id, con3_id;
+  
+  pthread_create(&prod_id, NULL, producer, NULL);
   pthread_join(prod_id, NULL);
+
+  pthread_create(&con1_id, NULL, consumer, NULL);
+  pthread_create(&con2_id, NULL, consumer, NULL);
+  pthread_create(&con3_id, NULL, consumer, NULL);
+
   pthread_join(con1_id, NULL);
+  pthread_join(con2_id, NULL);
+  pthread_join(con3_id, NULL);
 
   chan_destroy(&ch);
 
