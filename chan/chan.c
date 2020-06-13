@@ -131,14 +131,14 @@ static int __unbuffered_chan_recv(chan_t* c) {
   if(c->cond_write.busy)
     pthread_cond_signal(&c->cond_write.cond); // avisa que uma tentativa de leitura está tentando ser feita
 
-  do {
+  while(c->queue.length == 0) {
     chan_cond_wait(&c->cond_read, &c->mutex); // dá um unlock na mutex para que a thread que deseja inserir possa continuar a ação e espera pela resposta
 
     if(c->closed) // canal foi fechado enquanto esperava
       return ECLOSED;
 
-    // o do-while é pra verificar se o item realmente foi inserido na fila e evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
-  } while(c->queue.length == 0);
+    // o while é pra verificar se o item realmente foi inserido na fila e evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
+  }
 
   return SUCCESS;
 }
