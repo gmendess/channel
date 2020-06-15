@@ -22,10 +22,17 @@ typedef struct chan_cond chan_cond_t;
 // syntax-sugar 
 // c = ponteiro para chan_cond_t
 // mutex = ponteiro para pthread_mutex_t
-#define chan_cond_wait(c, mutex) \
-  (*c).busy += 1; \
-  pthread_cond_wait(c.cond, mutex); \
-  (*c).busy -= 1;
+#define chan_cond_wait(c, mutex) do { \
+  (*c).busy += 1;                     \
+  pthread_cond_wait(c.cond, mutex);   \
+} while(0)
+
+// syntax-sugar 
+// c = ponteiro para chan_cond_t
+#define chan_cond_signal(c) do { \
+  (*c).busy -= 1;                \
+  pthread_cond_signal(c.cond);   \
+} while(0)
 
 struct chan {
   queue_t queue;
