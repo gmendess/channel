@@ -6,56 +6,52 @@ chan_t ch;
 
 void* producer(void* args) {
 
-  while(1) {
-    int* value = malloc(sizeof(int));
-    
-    scanf("%d", value);
-    if(*value == 0) {
-      free(value);
-      break;
-    }
-    
+  int* value = NULL;
+  for(int x = 0; x < 10000; x++) {
+    value = malloc(sizeof(int));
+    *value = x;
     chan_send(&ch, value);
-    puts("Produced!");
   }
 
   chan_close(&ch);
 
-  pthread_exit(0);
+  return NULL;
+}
+
+void process(void* v, void* args) {
+  int* sum = (int*) args;
+  *sum += *(int*) v;
+  free(v);
 }
 
 void* consumer(void* args) {
-  void* value = NULL;
+  int x = 0;
 
-  printf("thread %ld >>> ", pthread_self());
-  if(chan_recv(&ch, &value) != ECLOSED) {
-    printf("%d\n", *(int*) value);
-    free(value);
-  }
-  else {
-    puts("Channel closed!");
-  }
+  chan_for_range(&ch, process, &x);
 
-  pthread_exit(0);
+  printf("Soma channel: %d\n", x);
+
+  return NULL;
 }
 
 int main() {
 
-  chan_init(&ch, 2);
-  pthread_t prod_id, con1_id, con2_id, con3_id;
+  chan_init(&ch, 0);
+  pthread_t prod_id, con1_id;
   
   pthread_create(&prod_id, NULL, producer, NULL);
-  pthread_join(prod_id, NULL);
-
   pthread_create(&con1_id, NULL, consumer, NULL);
-  pthread_create(&con2_id, NULL, consumer, NULL);
-  pthread_create(&con3_id, NULL, consumer, NULL);
 
+  pthread_join(prod_id, NULL);
   pthread_join(con1_id, NULL);
-  pthread_join(con2_id, NULL);
-  pthread_join(con3_id, NULL);
 
   chan_destroy(&ch);
+
+  size_t soma = 0;
+  for(int x = 0; x < 10000; x++)
+    soma += x;
+
+  printf("Prova real: %lu\n", soma);
 
   return 0;
 }
