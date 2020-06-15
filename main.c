@@ -6,9 +6,9 @@ chan_t ch;
 
 void* producer(void* args) {
 
-  int* value = NULL;
-  for(int x = 0; x < 10000; x++) {
-    value = malloc(sizeof(int));
+  unsigned long long* value = NULL;
+  for(unsigned long long x = 0; x < 10000000; x++) {
+    value = malloc(sizeof(unsigned long long));
     *value = x;
     chan_send(&ch, value);
   }
@@ -19,24 +19,24 @@ void* producer(void* args) {
 }
 
 void process(void* v, void* args) {
-  int* sum = (int*) args;
-  *sum += *(int*) v;
+  unsigned long long* sum = (unsigned long long*) args;
+  *sum += *(unsigned long long*) v;
   free(v);
 }
 
 void* consumer(void* args) {
-  int x = 0;
+  unsigned long long x = 0;
 
   chan_for_range(&ch, process, &x);
 
-  printf("Soma channel: %d\n", x);
+  printf("Soma channel: %llu\n", x);
 
   return NULL;
 }
 
 int main() {
 
-  chan_init(&ch, 0);
+  chan_init(&ch, 1000);
   pthread_t prod_id, con1_id;
   
   pthread_create(&prod_id, NULL, producer, NULL);
@@ -47,11 +47,11 @@ int main() {
 
   chan_destroy(&ch);
 
-  size_t soma = 0;
-  for(int x = 0; x < 10000; x++)
+  unsigned long long soma = 0;
+  for(unsigned long long x = 0; x < 10000000; x++)
     soma += x;
 
-  printf("Prova real: %lu\n", soma);
+  printf("Prova real: %llu\n", soma);
 
   return 0;
 }
