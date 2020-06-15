@@ -118,7 +118,7 @@ int chan_send(chan_t* c, void* value) {
   if(status != ECLOSED)
     queue_push_back(&c->queue, value); // insere no final da fila o conteúdo passa em 'value
 
-  pthread_cond_signal(&c->cond_read.cond); // informa que um valor foi inserido na fila
+  chan_cond_signal(&c->cond_read); // informa que um valor foi inserido na fila
   pthread_mutex_unlock(&c->mutex);
 
   return status;
@@ -129,14 +129,13 @@ static int __unbuffered_chan_recv(chan_t* c) {
     return ECLOSED;
 
   if(c->cond_write.busy)
-    pthread_cond_signal(&c->cond_write.cond); // avisa que uma tentativa de leitura está tentando ser feita
+    chan_cond_signal(&c->cond_write); // avisa que uma tentativa de leitura está tentando ser feita
 
   while(c->queue.length == 0) {
+    if(c->closed)
+      return ECLOSED; // tentando ler de um canal fechado e vazio
+
     chan_cond_wait(&c->cond_read, &c->mutex); // dá um unlock na mutex para que a thread que deseja inserir possa continuar a ação e espera pela resposta
-
-    if(c->closed) // canal foi fechado enquanto esperava
-      return ECLOSED;
-
     // o while é pra verificar se o item realmente foi inserido na fila e evitar spurious wakeup (https://en.wikipedia.org/wiki/Spurious_wakeup)
   }
 
@@ -170,7 +169,7 @@ int chan_recv(chan_t* c, void** ret) {
     // channel unbuffered não avisa que o conteúdo foi lido, pois poderia influenciar em uma segunda escrita
   else {
     status = __buffered_chan_recv(c);
-    pthread_cond_signal(&c->cond_write.cond);
+    chan_cond_signal(&c->cond_write);
   }
 
   if(status == SUCCESS)
