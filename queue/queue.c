@@ -40,11 +40,11 @@ void queue_pop_front(queue_t* q, void** ret) {
 }
 
 void queue_destroy(queue_t* q) {
-  free(q->content);
-
   q->content  = NULL;
   q->capacity = 0;
   q->length   = 0;
   q->head     = 0;
   q->tail     = 0;
+
+  free(q->content);
 }
